@@ -10,9 +10,9 @@ A central claim of this work is that persisted code blocks, composed workflows, 
 
 This self-extending property raises fundamental questions at the intersection of agent architecture, dataflow programming, and graph-based workflow composition. In particular, we identify a core tension in **state management for dynamically composed heterogeneous processing graphs**: code blocks require interoperability (suggesting universal input/output contracts), yet the intermediate outputs between sequential steps are often ephemeral, schema-diverse, and ill-suited to storage in a monolithic shared state. We argue that this problem demands a *layered state model* that distinguishes between edge-scoped data flow, workflow-scoped context, and persistent agent memory — drawing on concepts from dataflow programming, scoped environments in programming language theory, and hypergraph-based workflow representations.
 
-We identify the **[Agent Skills](https://agentskills.io/home)** open standard — a portable format for packaging agent capabilities as folders of instructions, scripts, and resources — as a natural serialization layer for procedural memory in this architecture. While not yet integrated into the [smolagents](https://huggingface.co/docs/smolagents) framework our prototype is built on, Agent Skills provides the discovery, activation, and progressive disclosure mechanisms that map directly onto the procedural memory lifecycle. We propose extensions to the standard to support composability metadata and workflow graph packaging.
+We identify the **[Agent Skills](https://agentskills.io/home)** open standard ([overview](https://agentskills.io/home), [specification](https://agentskills.io/specification)) — a portable format for packaging agent capabilities as folders of instructions, scripts, and resources — as a natural serialization layer for procedural memory in this architecture. While not yet integrated into the [smolagents](https://huggingface.co/docs/smolagents) framework our prototype is built on, Agent Skills provides the discovery, activation, and progressive disclosure mechanisms that map directly onto the procedural memory lifecycle. We propose extensions to the standard to support composability metadata and workflow graph packaging. The architecture is deliberately framework-agnostic: smolagents — an open-source framework maintained by Hugging Face and chosen for its native CodeAct support — is a modular component that can be replaced without affecting the core contributions.
 
-We outline a research agenda organized around five pillars: (1) formalizing composability contracts for agent-authored code blocks, (2) designing a layered state architecture for dynamic workflow graphs, (3) developing graph-theoretic representations for self-modifying agent workflows, (4) understanding procedural memory formation, retrieval, and refinement in self-extending agents, and (5) building evaluation frameworks for correctness, safety, and emergent capability.
+We outline a research agenda organized around six pillars: (1) formalizing composability contracts for agent-authored code blocks, (2) designing a layered state architecture for dynamic workflow graphs, (3) developing graph-theoretic representations for self-modifying agent workflows, (4) understanding procedural memory formation, retrieval, and refinement in self-extending agents, (5) solving secure authentication and credential management for agent-authored code that interacts with external systems and APIs, and (6) building evaluation frameworks for correctness, safety, and emergent capability.
 
 ---
 
@@ -126,6 +126,8 @@ class BlockSignature:
     context_reads: list[str]        # Keys this block reads from workflow context (Layer 3)
     context_writes: list[str]       # Keys this block writes to workflow context (Layer 3)
     requires_llm: bool              # Whether this block invokes an LLM
+    external_services: list[str]    # External APIs/systems this block connects to
+    auth_requirements: list[str]    # Named credential scopes required at runtime
     triggers: list[TriggerSpec]     # Conditions under which this block should be invoked
     version: str                    # Enables procedural memory evolution
     lineage: list[str]              # Chain of blocks this was derived from
@@ -175,7 +177,28 @@ The procedural memory evolves through a cycle:
 
 This cycle mirrors how human procedural knowledge develops: initial effortful construction, followed by retrieval and adaptation, with gradual refinement toward efficiency and robustness.
 
-### 2.6 Agent Skills as the Packaging Standard for Procedural Memory
+### 2.6 Secure Authentication with External Systems and APIs
+
+Real-world workflows rarely operate in isolation. Code blocks routinely need to interact with external systems — REST APIs, databases, cloud storage, SaaS platforms, payment processors, enterprise identity providers. This makes **secure credential management** a first-class architectural concern, not an afterthought.
+
+The challenge is amplified by several properties unique to this architecture:
+
+- **Agent-authored code handles secrets.** The agent writes the code blocks that make authenticated API calls. This means an LLM is generating code that will, at runtime, have access to credentials. The system must ensure that the agent cannot exfiltrate, log, or inadvertently expose secrets — even though it authored the code that uses them.
+- **Unattended execution.** In the "Build with AI, Execute Deterministically" paradigm, workflows run without human supervision — via CRON jobs, webhooks, or event triggers. Credentials must be available at runtime without interactive authentication flows (no browser-based OAuth redirects, no manual password entry).
+- **Shared and transferred workflows.** Procedural memory is transferable: workflows can be shared between agent instances, teams, or organizations. Credentials must *never* travel with the workflow. A skill exported from one environment and imported into another must bind to the *target environment's* credentials, not carry over the source's.
+- **Least privilege.** A code block that reads from an API should not have write access. A block that accesses one service should not be able to reach another. The `auth_requirements` field in `BlockSignature` declares named credential scopes, enabling the runtime to enforce per-block access boundaries.
+- **Credential lifecycle.** Tokens expire, API keys get rotated, OAuth grants get revoked. The runtime must handle refresh, rotation, and revocation transparently, without requiring changes to the code blocks themselves.
+
+We envision a **credential broker** pattern: code blocks never hold secrets directly. Instead, they declare their requirements (`auth_requirements: ["s3:read", "stripe:charges:write"]`), and the runtime injects credentials at execution time via a secure broker that mediates access to a credential store (vault, secrets manager, environment-scoped keychain). The broker enforces scope boundaries, handles token refresh, and provides audit logging of all credential usage.
+
+Open questions for research include:
+
+- **Trust boundaries.** When the agent *authors* a code block that declares auth requirements, who approves the grant? Should there be a human-in-the-loop approval step before a newly authored block gains access to external systems? How does this interact with the self-modification capability (the agent could rewrite a block to request broader scopes)?
+- **Formal access control models.** Can we adapt capability-based security or attribute-based access control (ABAC) to the workflow graph context? Each node in the graph has a declared security scope; the graph as a whole has a composite scope that is the union (or intersection, depending on policy) of its nodes' scopes.
+- **Audit and provenance.** Every credential use should be traceable to: which workflow, which node, which execution run, which trigger. This creates a full audit chain from external API call back to the agent's original design decision.
+- **Sandboxing agent-authored code.** The code that handles credentials is agent-authored. Runtime sandboxing (restricted I/O, network policy enforcement, no credential access outside the broker API) is essential to prevent both accidental leakage and adversarial exploitation.
+
+### 2.7 Agent Skills as the Packaging Standard for Procedural Memory
 
 A crucial practical dimension of this architecture is the question of *how procedural memory is serialized, shared, and discovered*. Here, we identify a strong alignment with the **[Agent Skills](https://agentskills.io/home)** open standard ([specification](https://agentskills.io/specification)) — a lightweight, portable format for packaging agent capabilities as self-contained directory structures.
 
@@ -189,7 +212,7 @@ skill-name/
 └── assets/           # Templates, schemas, resources
 ```
 
-The format uses **progressive disclosure** to manage context efficiently: at startup, agents load only skill names and descriptions (~100 tokens each); when a task matches, the full `SKILL.md` body is loaded; scripts and references are loaded only when actively needed during execution. This three-tier loading model directly mirrors the distinction between skill *discovery*, *activation*, and *execution* in our procedural memory lifecycle (Section 2.4).
+The format uses **progressive disclosure** to manage context efficiently: at startup, agents load only skill names and descriptions (~100 tokens each); when a task matches, the full `SKILL.md` body is loaded; scripts and references are loaded only when actively needed during execution. This three-tier loading model directly mirrors the distinction between skill *discovery*, *activation*, and *execution* in our procedural memory lifecycle (Section 2.5).
 
 The alignment between Agent Skills and our architecture is deep:
 
@@ -211,6 +234,7 @@ However, the current Agent Skills specification does not natively address severa
 - **Workflow graphs.** Skills are individual units; there is no standard for packaging a *composed workflow* (a graph of skills) as a higher-order skill.
 - **Edge-scoped state.** The specification does not address how data flows between skills when they are composed.
 - **LLM-in-the-loop declaration.** There is no way to indicate that a skill requires LLM access or what kind of LLM reasoning it performs.
+- **Authentication and credential scopes.** There is no standard way to declare that a skill requires authenticated access to external systems, what credential scopes it needs, or how credentials should be injected at runtime.
 
 These gaps represent concrete **extension opportunities**: our research can propose additions to the Agent Skills specification that support composability, workflow packaging, and the layered state model. This positions the project not only as a consumer of the standard but as a contributor to its evolution.
 
@@ -253,6 +277,8 @@ The architecture connects to several established areas — each representing a p
 
 - **Category Theory / Composability.** Code blocks as morphisms, their input/output types as objects, sequential composition as morphism composition, and parallel composition as a monoidal product. This could provide a formal foundation for reasoning about when two blocks are composable.
 
+- **Capability-Based Security and Access Control.** The credential broker pattern and per-node scope declarations connect to capability-based security models and attribute-based access control (ABAC). The workflow graph introduces a novel dimension: the *composite security posture* of a graph is derived from the topology and scope declarations of its nodes, and self-modification (graph rewriting) creates a dynamic attack surface that static access control models were not designed for.
+
 ---
 
 ## 4. Research Agenda and Roadmap
@@ -266,6 +292,7 @@ The architecture connects to several established areas — each representing a p
 - **Task 1.3** — Formalize workflow graphs. Determine the appropriate graph formalism (DAG, directed graph with annotations, hypergraph) and specify the semantics of nodes, edges, and control-flow constructs.
 - **Task 1.4** — Formalize the procedural memory model. Define what constitutes a "skill," how skills are indexed for retrieval, how similarity between task contexts and stored procedures is measured, and how versioning/lineage is tracked.
 - **Task 1.5** — Analyze the [Agent Skills specification](https://agentskills.io/specification) against our requirements. Identify gaps (composability metadata, workflow graph packaging, edge-scoped state, LLM-in-the-loop declaration) and propose formal extensions that align the standard with the layered state model and graph-based workflow composition.
+- **Task 1.6** — Formalize the security and authentication model. Define the trust boundaries for agent-authored code that accesses external systems. Specify the credential broker interface, scope declaration language, and approval model for credential grants — including how scope escalation via self-modification is detected and governed.
 
 **Deliverable:** A formal specification document and a positioning paper.
 
@@ -278,6 +305,7 @@ The architecture connects to several established areas — each representing a p
 - **Task 2.3** — Implement [Agent Skills](https://agentskills.io/home) support in [smolagents](https://huggingface.co/docs/smolagents). Enable the agent to discover, load, and execute skills packaged in the Agent Skills format. This includes the progressive disclosure pipeline (metadata → instructions → scripts/resources) and the ability for the agent to *author new skills* that conform to the standard.
 - **Task 2.4** — Implement the workflow graph executor. Support sequential, parallel, branching, and error-handling execution over DAGs of code blocks.
 - **Task 2.5** — Integrate LLM-in-the-loop blocks. Standardize how code blocks invoke LLMs, handle streaming, manage token budgets, and propagate errors.
+- **Task 2.6** — Implement the credential broker and runtime sandboxing. Build the secure credential injection pipeline: code blocks declare `auth_requirements`, the runtime resolves them against a credential store, injects secrets at execution time, and enforces per-block scope boundaries. Implement sandboxing for agent-authored code to prevent credential exfiltration.
 
 **Deliverable:** A working runtime with API, capable of executing agent-authored multi-step workflows.
 
@@ -299,9 +327,10 @@ The architecture connects to several established areas — each representing a p
 
 - **Task 4.1** — Correctness evaluation. Define benchmarks for workflow correctness: does the composed workflow produce the expected output? How does composition quality degrade with workflow complexity?
 - **Task 4.2** — Safety analysis. What happens when the agent creates a workflow with side effects, infinite loops, or resource exhaustion? Define a sandboxing model and constraint language.
-- **Task 4.3** — Graph-theoretic analysis. Apply graph metrics (depth, width, connectivity, cyclicity) to agent-authored workflows. Correlate graph structure with task complexity and execution performance.
-- **Task 4.4** — Procedural memory dynamics. Do agents develop reusable block libraries over time? How does the skill library grow, specialize, and stabilize? Is there convergence toward canonical workflow patterns for recurring task classes? What is the relationship between library size and agent performance on novel tasks?
-- **Task 4.5** — Comparative evaluation. Benchmark against static-toolset agents and developer-authored LangGraph workflows on equivalent tasks. Quantify the advantage (or cost) of self-extension.
+- **Task 4.3** — Security and authentication audit. Evaluate the credential broker under adversarial conditions: can agent-authored code circumvent scope boundaries? How robust is the sandboxing against credential exfiltration? Analyze the composite security posture of workflow graphs (the union of all node scopes) and test scope-escalation detection when the agent rewrites blocks.
+- **Task 4.4** — Graph-theoretic analysis. Apply graph metrics (depth, width, connectivity, cyclicity) to agent-authored workflows. Correlate graph structure with task complexity and execution performance.
+- **Task 4.5** — Procedural memory dynamics. Do agents develop reusable block libraries over time? How does the skill library grow, specialize, and stabilize? Is there convergence toward canonical workflow patterns for recurring task classes? What is the relationship between library size and agent performance on novel tasks?
+- **Task 4.6** — Comparative evaluation. Benchmark against static-toolset agents and developer-authored LangGraph workflows on equivalent tasks. Quantify the advantage (or cost) of self-extension.
 
 **Deliverable:** Evaluation framework, benchmark suite, and an analytical paper on emergent workflow structure and procedural memory dynamics.
 
@@ -321,16 +350,29 @@ The architecture connects to several established areas — each representing a p
 
 6. **Self-modification safety.** How do we ensure that an agent's graph-rewriting capabilities do not produce unsafe or degenerate workflows? Can graph grammars provide the right constraint language?
 
-7. **LLM-node semantics.** How should we reason about the behavior of non-deterministic (LLM) nodes in a workflow graph? What guarantees (if any) can we provide about end-to-end workflow behavior when some nodes are stochastic?
+7. **Secure authentication and credential management.** How should the architecture handle authentication with external systems when code blocks are agent-authored and workflows run unattended? What trust model governs an agent's ability to request credential scopes — and who approves escalation when the agent rewrites a block to request broader access? Can capability-based security or ABAC models be adapted to the workflow graph, where each node declares scopes and the graph's composite security posture is derived from its topology?
 
-8. **Execution independence and the deterministic boundary.** In the "Build with AI, Execute Deterministically" paradigm, what fraction of real-world workflows can be fully "compiled away" from LLM dependence? Can the runtime automatically partition a hybrid workflow into deterministic sub-graphs (executable standalone) and LLM-dependent sub-graphs? How should the system handle graceful degradation when LLM access is unavailable — queue, skip, or substitute with fallback logic?
+8. **LLM-node semantics.** How should we reason about the behavior of non-deterministic (LLM) nodes in a workflow graph? What guarantees (if any) can we provide about end-to-end workflow behavior when some nodes are stochastic?
 
-9. **Emergence and convergence.** Over many tasks, do agents develop stable tool libraries and recurring workflow patterns? Can we characterize these patterns formally? Does the procedural memory exhibit properties analogous to human skill consolidation — increasing efficiency, decreasing variability, and chunking of sub-procedures?
+9. **Execution independence and the deterministic boundary.** In the "Build with AI, Execute Deterministically" paradigm, what fraction of real-world workflows can be fully "compiled away" from LLM dependence? Can the runtime automatically partition a hybrid workflow into deterministic sub-graphs (executable standalone) and LLM-dependent sub-graphs? How should the system handle graceful degradation when LLM access is unavailable — queue, skip, or substitute with fallback logic?
 
-10. **Standardization and interoperability.** How should the [Agent Skills specification](https://agentskills.io/specification) be extended to support composability metadata, workflow graph packaging, and layered state declarations? What is the minimal set of extensions that enables automated skill composition while preserving the format's simplicity and portability?
+10. **Emergence and convergence.** Over many tasks, do agents develop stable tool libraries and recurring workflow patterns? Can we characterize these patterns formally? Does the procedural memory exhibit properties analogous to human skill consolidation — increasing efficiency, decreasing variability, and chunking of sub-procedures?
+
+11. **Standardization and interoperability.** How should the [Agent Skills specification](https://agentskills.io/specification) be extended to support composability metadata, workflow graph packaging, and layered state declarations? What is the minimal set of extensions that enables automated skill composition while preserving the format's simplicity and portability?
 
 ---
 
 ## 6. Technical Context
 
-The current prototype is built on **[smolagents](https://huggingface.co/docs/smolagents)** (`ToolCallingAgent`), using Python as the code-execution substrate. The agent operates with four core tools: `write_code`, `read_code`, `execute_code`, and `write_metadata`. Code blocks are persisted as Python files with JSON metadata sidecars. A key near-term integration target is the **[Agent Skills](https://agentskills.io/home)** open standard ([specification](https://agentskills.io/specification)), which provides a portable packaging format for skills (instructions + scripts + resources) that is already adopted by several agent products but not yet supported in smolagents. Implementing Agent Skills support would simultaneously provide the serialization layer for procedural memory and create an interoperability bridge to the broader agent ecosystem. The immediate next steps are formalizing the block interface, implementing the layered state model, integrating Agent Skills, and progressing to graph-based workflow composition and procedural memory management.
+### Agent Framework: smolagents
+
+The current prototype is built on **[smolagents](https://huggingface.co/docs/smolagents)**, using Python as the code-execution substrate. smolagents is an **open-source** agent framework maintained by **[Hugging Face](https://huggingface.co/)**, headquartered in Paris and deeply rooted in the European AI ecosystem. It was chosen for two reasons:
+
+- **CodeAct as first-class paradigm.** smolagents is the first broadly adopted agent framework to integrate the CodeAct pattern as a core component — enabling agents to write and execute code as their primary mode of action, rather than merely selecting from predefined tool calls. This makes it a natural substrate for our architecture, where code authorship *is* the central capability.
+- **Lightweight and modular.** The framework is deliberately minimal ("smol"), avoiding the heavy abstraction layers of larger frameworks. This makes it easier to extend with custom components (the layered state runtime, the procedural memory store, the credential broker) without fighting framework conventions.
+
+Importantly, **the agent framework is a modular, replaceable component — not a lock-in**. The architecture's core contributions — the layered state model, the `BlockSignature` contract, the workflow graph executor, the procedural memory lifecycle, the credential broker, and the Agent Skills integration — are framework-agnostic by design. They sit *above* the agent framework layer: any agent that can write code, persist it, and execute it can drive the system. smolagents could be replaced with another framework (LangChain, CrewAI, AutoGen, or a custom implementation) without redesigning the architecture. This decoupling is deliberate and important for both academic reproducibility and industrial adoption.
+
+### Current State and Near-Term Targets
+
+The agent currently operates with four core tools: `write_code`, `read_code`, `execute_code`, and `write_metadata`. Code blocks are persisted as Python files with JSON metadata sidecars. A key near-term integration target is the **[Agent Skills](https://agentskills.io/home)** open standard ([specification](https://agentskills.io/specification)), which provides a portable packaging format for skills (instructions + scripts + resources) that is already adopted by several agent products but not yet supported in smolagents. Implementing Agent Skills support would simultaneously provide the serialization layer for procedural memory and create an interoperability bridge to the broader agent ecosystem. The immediate next steps are formalizing the block interface, implementing the layered state model, integrating Agent Skills, and progressing to graph-based workflow composition and procedural memory management.
