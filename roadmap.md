@@ -10,7 +10,7 @@ A central claim of this work is that persisted code blocks, composed workflows, 
 
 This self-extending property raises fundamental questions at the intersection of agent architecture, dataflow programming, and graph-based workflow composition. In particular, we identify a core tension in **state management for dynamically composed heterogeneous processing graphs**: code blocks require interoperability (suggesting universal input/output contracts), yet the intermediate outputs between sequential steps are often ephemeral, schema-diverse, and ill-suited to storage in a monolithic shared state. We argue that this problem demands a *layered state model* that distinguishes between edge-scoped data flow, workflow-scoped context, and persistent agent memory — drawing on concepts from dataflow programming, scoped environments in programming language theory, and hypergraph-based workflow representations.
 
-We identify the **Agent Skills** open standard (agentskills.io) — a portable format for packaging agent capabilities as folders of instructions, scripts, and resources — as a natural serialization layer for procedural memory in this architecture. While not yet integrated into the smolagents framework our prototype is built on, Agent Skills provides the discovery, activation, and progressive disclosure mechanisms that map directly onto the procedural memory lifecycle. We propose extensions to the standard to support composability metadata and workflow graph packaging.
+We identify the **[Agent Skills](https://agentskills.io/home)** open standard — a portable format for packaging agent capabilities as folders of instructions, scripts, and resources — as a natural serialization layer for procedural memory in this architecture. While not yet integrated into the [smolagents](https://huggingface.co/docs/smolagents) framework our prototype is built on, Agent Skills provides the discovery, activation, and progressive disclosure mechanisms that map directly onto the procedural memory lifecycle. We propose extensions to the standard to support composability metadata and workflow graph packaging.
 
 We outline a research agenda organized around five pillars: (1) formalizing composability contracts for agent-authored code blocks, (2) designing a layered state architecture for dynamic workflow graphs, (3) developing graph-theoretic representations for self-modifying agent workflows, (4) understanding procedural memory formation, retrieval, and refinement in self-extending agents, and (5) building evaluation frameworks for correctness, safety, and emergent capability.
 
@@ -177,7 +177,7 @@ This cycle mirrors how human procedural knowledge develops: initial effortful co
 
 ### 2.6 Agent Skills as the Packaging Standard for Procedural Memory
 
-A crucial practical dimension of this architecture is the question of *how procedural memory is serialized, shared, and discovered*. Here, we identify a strong alignment with the **Agent Skills** open standard (agentskills.io) — a lightweight, portable format for packaging agent capabilities as self-contained directory structures.
+A crucial practical dimension of this architecture is the question of *how procedural memory is serialized, shared, and discovered*. Here, we identify a strong alignment with the **[Agent Skills](https://agentskills.io/home)** open standard ([specification](https://agentskills.io/specification)) — a lightweight, portable format for packaging agent capabilities as self-contained directory structures.
 
 An Agent Skill is a folder containing a `SKILL.md` file (metadata + natural-language instructions), optional executable scripts, reference documentation, and static assets:
 
@@ -214,7 +214,7 @@ However, the current Agent Skills specification does not natively address severa
 
 These gaps represent concrete **extension opportunities**: our research can propose additions to the Agent Skills specification that support composability, workflow packaging, and the layered state model. This positions the project not only as a consumer of the standard but as a contributor to its evolution.
 
-Critically, Agent Skills support is **not yet implemented in smolagents** — the framework our prototype is built on. Implementing this integration is a near-term deliverable that would simultaneously advance the research agenda and produce a practical, reusable open-source contribution.
+Critically, Agent Skills support is **not yet implemented in [smolagents](https://huggingface.co/docs/smolagents)** — the framework our prototype is built on. Implementing this integration is a near-term deliverable that would simultaneously advance the research agenda and produce a practical, reusable open-source contribution.
 
 ---
 
@@ -230,7 +230,7 @@ Critically, Agent Skills support is **not yet implemented in smolagents** — th
 | Sub-agents | Predefined agent nodes | Dynamically created via LLM-in-the-loop code blocks |
 | Self-modification | Not supported | Core capability |
 | Memory of procedures | Not explicit | First-class: code blocks and graphs *are* procedural memory |
-| Skill packaging standard | Not applicable | Agent Skills format (agentskills.io) as serialization layer |
+| Skill packaging standard | Not applicable | [Agent Skills](https://agentskills.io/home) format as serialization layer |
 | Runtime execution model | LLM required at every invocation | "Build with AI, Execute Deterministically" — LLM at design time, optional at runtime |
 
 ### 3.2 Key Theoretical Touchpoints
@@ -265,7 +265,7 @@ The architecture connects to several established areas — each representing a p
 - **Task 1.2** — Define the `BlockSignature` contract and schema language. Investigate JSON Schema, algebraic data types, or dependent types as candidates. Evaluate the tradeoff between expressiveness and the agent's ability to reason about schemas.
 - **Task 1.3** — Formalize workflow graphs. Determine the appropriate graph formalism (DAG, directed graph with annotations, hypergraph) and specify the semantics of nodes, edges, and control-flow constructs.
 - **Task 1.4** — Formalize the procedural memory model. Define what constitutes a "skill," how skills are indexed for retrieval, how similarity between task contexts and stored procedures is measured, and how versioning/lineage is tracked.
-- **Task 1.5** — Analyze the Agent Skills specification against our requirements. Identify gaps (composability metadata, workflow graph packaging, edge-scoped state, LLM-in-the-loop declaration) and propose formal extensions that align the standard with the layered state model and graph-based workflow composition.
+- **Task 1.5** — Analyze the [Agent Skills specification](https://agentskills.io/specification) against our requirements. Identify gaps (composability metadata, workflow graph packaging, edge-scoped state, LLM-in-the-loop declaration) and propose formal extensions that align the standard with the layered state model and graph-based workflow composition.
 
 **Deliverable:** A formal specification document and a positioning paper.
 
@@ -275,7 +275,7 @@ The architecture connects to several established areas — each representing a p
 
 - **Task 2.1** — Implement the layered state runtime. Build the Layer 2 (edge-scoped) and Layer 3 (context) state managers with proper lifecycle management.
 - **Task 2.2** — Implement the code block registry and procedural memory store. Support authoring, persistence, versioning, retrieval, and discovery of code blocks by the agent.
-- **Task 2.3** — Implement Agent Skills support in smolagents. Enable the agent to discover, load, and execute skills packaged in the Agent Skills format. This includes the progressive disclosure pipeline (metadata → instructions → scripts/resources) and the ability for the agent to *author new skills* that conform to the standard.
+- **Task 2.3** — Implement [Agent Skills](https://agentskills.io/home) support in [smolagents](https://huggingface.co/docs/smolagents). Enable the agent to discover, load, and execute skills packaged in the Agent Skills format. This includes the progressive disclosure pipeline (metadata → instructions → scripts/resources) and the ability for the agent to *author new skills* that conform to the standard.
 - **Task 2.4** — Implement the workflow graph executor. Support sequential, parallel, branching, and error-handling execution over DAGs of code blocks.
 - **Task 2.5** — Integrate LLM-in-the-loop blocks. Standardize how code blocks invoke LLMs, handle streaming, manage token budgets, and propagate errors.
 
@@ -327,10 +327,10 @@ The architecture connects to several established areas — each representing a p
 
 9. **Emergence and convergence.** Over many tasks, do agents develop stable tool libraries and recurring workflow patterns? Can we characterize these patterns formally? Does the procedural memory exhibit properties analogous to human skill consolidation — increasing efficiency, decreasing variability, and chunking of sub-procedures?
 
-10. **Standardization and interoperability.** How should the Agent Skills specification be extended to support composability metadata, workflow graph packaging, and layered state declarations? What is the minimal set of extensions that enables automated skill composition while preserving the format's simplicity and portability?
+10. **Standardization and interoperability.** How should the [Agent Skills specification](https://agentskills.io/specification) be extended to support composability metadata, workflow graph packaging, and layered state declarations? What is the minimal set of extensions that enables automated skill composition while preserving the format's simplicity and portability?
 
 ---
 
 ## 6. Technical Context
 
-The current prototype is built on **smolagents** (`ToolCallingAgent`), using Python as the code-execution substrate. The agent operates with four core tools: `write_code`, `read_code`, `execute_code`, and `write_metadata`. Code blocks are persisted as Python files with JSON metadata sidecars. A key near-term integration target is the **Agent Skills** open standard (agentskills.io), which provides a portable packaging format for skills (instructions + scripts + resources) that is already adopted by several agent products but not yet supported in smolagents. Implementing Agent Skills support would simultaneously provide the serialization layer for procedural memory and create an interoperability bridge to the broader agent ecosystem. The immediate next steps are formalizing the block interface, implementing the layered state model, integrating Agent Skills, and progressing to graph-based workflow composition and procedural memory management.
+The current prototype is built on **[smolagents](https://huggingface.co/docs/smolagents)** (`ToolCallingAgent`), using Python as the code-execution substrate. The agent operates with four core tools: `write_code`, `read_code`, `execute_code`, and `write_metadata`. Code blocks are persisted as Python files with JSON metadata sidecars. A key near-term integration target is the **[Agent Skills](https://agentskills.io/home)** open standard ([specification](https://agentskills.io/specification)), which provides a portable packaging format for skills (instructions + scripts + resources) that is already adopted by several agent products but not yet supported in smolagents. Implementing Agent Skills support would simultaneously provide the serialization layer for procedural memory and create an interoperability bridge to the broader agent ecosystem. The immediate next steps are formalizing the block interface, implementing the layered state model, integrating Agent Skills, and progressing to graph-based workflow composition and procedural memory management.
