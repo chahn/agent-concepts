@@ -189,7 +189,15 @@ The challenge is amplified by several properties unique to this architecture:
 - **Least privilege.** A code block that reads from an API should not have write access. A block that accesses one service should not be able to reach another. The `auth_requirements` field in `BlockSignature` declares named credential scopes, enabling the runtime to enforce per-block access boundaries.
 - **Credential lifecycle.** Tokens expire, API keys get rotated, OAuth grants get revoked. The runtime must handle refresh, rotation, and revocation transparently, without requiring changes to the code blocks themselves.
 
-We envision a **credential broker** pattern: code blocks never hold secrets directly. Instead, they declare their requirements (`auth_requirements: ["s3:read", "stripe:charges:write"]`), and the runtime injects credentials at execution time via a secure broker that mediates access to a credential store (vault, secrets manager, environment-scoped keychain). The broker enforces scope boundaries, handles token refresh, and provides audit logging of all credential usage.
+The current prototype implements an **authentication proxy** pattern: a proxy layer intercepts outbound HTTP calls from code blocks and injects the required credentials (API keys, OAuth tokens, service account headers) at the network level. Neither the agent nor the code it authors ever sees or handles secrets directly — the code simply makes requests to external endpoints, and the proxy transparently attaches authentication before forwarding. This approach provides a strong baseline: even if agent-authored code is malicious or buggy, it cannot exfiltrate credentials it never possesses.
+
+However, the proxy pattern is one point in a larger design space. Other approaches to secure credential management must be researched and evaluated, including but not limited to:
+
+- **Credential broker injection.** Code blocks declare their requirements (`auth_requirements: ["s3:read", "stripe:charges:write"]`), and the runtime injects credentials into the execution environment at launch time via a secure broker that mediates access to a credential store (vault, secrets manager, environment-scoped keychain). Unlike the proxy, this gives code temporary access to secrets — requiring stronger sandboxing guarantees.
+- **Short-lived token minting.** The runtime mints scoped, time-limited tokens for each block execution, automatically expiring after the step completes. This limits the blast radius of any credential leak.
+- **Capability-based delegation.** Instead of injecting credentials, the runtime provides pre-authenticated client objects (e.g., a pre-configured S3 client) to the code block, restricting what operations the code can perform without exposing the underlying secret.
+
+Each approach involves different tradeoffs between security isolation, implementation complexity, latency overhead, and compatibility with diverse external APIs. Identifying the right approach — or combination of approaches — for different deployment contexts is a key research objective.
 
 Open questions for research include:
 
@@ -305,7 +313,7 @@ The architecture connects to several established areas — each representing a p
 - **Task 2.3** — Implement [Agent Skills](https://agentskills.io/home) support in [smolagents](https://huggingface.co/docs/smolagents). Enable the agent to discover, load, and execute skills packaged in the Agent Skills format. This includes the progressive disclosure pipeline (metadata → instructions → scripts/resources) and the ability for the agent to *author new skills* that conform to the standard.
 - **Task 2.4** — Implement the workflow graph executor. Support sequential, parallel, branching, and error-handling execution over DAGs of code blocks.
 - **Task 2.5** — Integrate LLM-in-the-loop blocks. Standardize how code blocks invoke LLMs, handle streaming, manage token budgets, and propagate errors.
-- **Task 2.6** — Implement the credential broker and runtime sandboxing. Build the secure credential injection pipeline: code blocks declare `auth_requirements`, the runtime resolves them against a credential store, injects secrets at execution time, and enforces per-block scope boundaries. Implement sandboxing for agent-authored code to prevent credential exfiltration.
+- **Task 2.6** — Extend authentication and runtime sandboxing beyond the current proxy prototype. Evaluate alternative credential management patterns (broker injection, short-lived token minting, capability-based delegation) for different deployment contexts. Implement per-block scope enforcement and audit logging of all credential usage.
 
 **Deliverable:** A working runtime with API, capable of executing agent-authored multi-step workflows.
 
