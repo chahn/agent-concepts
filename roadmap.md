@@ -316,7 +316,6 @@ We establish the theoretical framework and core abstractions:
   - Develop formal specification with proofs of scoping properties.
   - Elicit practical requirements from pilot customers.
   - Validate the formal model against the existing prototype.
-  - Publish positioning paper.
 
 - **Define the `BlockSignature` contract and schema language** (JSON Schema as baseline, evaluation of extensions).
   - Analyze schema expressiveness and type-theoretic properties of contract candidates.
@@ -327,14 +326,14 @@ We establish the theoretical framework and core abstractions:
   - Conduct gap analysis of the current specification against our requirements.
   - Design formal extensions.
   - Assess feasibility of proposed extensions against real-world constraints.
-  - Contribute extension proposals to the Agent Skills open governance process.
+  - Optional: Contribute extension proposals to the Agent Skills open governance process.
 
 - **Formalize the security model** — trust boundaries, scope declaration language, and approval model for credential grants.
   - Develop formal access-control model and threat-model analysis.
   - Conduct adversarial testing against the existing proxy implementation.
   - Identify deployment-specific attack vectors.
 
-**Deliverables:** Formal specification document, positioning paper, extension proposals for the Agent Skills standard.
+**Deliverables:** Formal specification document, extension proposals for the Agent Skills standard.
 
 #### WP 2: Core Runtime Implementation and Integration
 
@@ -487,7 +486,7 @@ Bavaria is characterized by a strong Mittelstand with high digitalization demand
 
 ### 7.3 Open-Source Contributions and Standardization
 
-The open-source contributions produced by the project (Agent Skills integration in smolagents, extension proposals for the Agent Skills standard) position Bavarian research — anchored at the University of Bayreuth — and industry as active shapers of the European AI ecosystem — rather than passive consumers of American or Chinese technology platforms.
+The open-source contributions produced by the project (features and improvements in smolagents or other agent frameworks, Agent Skills integration in smolagents, extension proposals for the Agent Skills standard) position Bavarian research — anchored at the University of Bayreuth — and industry as active shapers of the European AI ecosystem — rather than passive consumers of American or Chinese technology platforms.
 
 ---
 
@@ -512,7 +511,7 @@ The open-source contributions produced by the project (Agent Skills integration 
 
 | Milestone | Verifiable Deliverable |
 |---|---|
-| Formal specification completed | Specification document, positioning paper submitted |
+| Formal specification completed | Specification document, positioning paper? |
 | Layered state runtime implemented | Working prototype with Layer 2+3, unit tests |
 | Agent Skills integration in smolagents | Open-source release, functional proof with 5 skills |
 | Workflow graph executor with piloting | 3 industrial pilot scenarios completed |
